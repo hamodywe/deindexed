@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    name: test (node ${{ matrix.node }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # The suite runs the TypeScript sources directly, which needs the type
+        # stripping that became the default in Node 22.18. The published package
+        # is compiled and supports Node 20.10 — verified below rather than
+        # assumed here.
+        node: ['22.18', '24']
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: node dist/cli.js --version
+
+  supported-runtime:
+    name: oldest supported runtime (node 20.10)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.10'
+      - name: Run the built CLI on the oldest supported Node
+        run: |
+          node --version
+          node dist/cli.js --version
+          node dist/cli.js examples/vanished --site example.com --json > report.json || true
+          node -e "
+            const r = require('./report.json');
+            if (r.schemaVersion !== 1) throw new Error('unexpected schema version');
+            if (r.summary.indexable !== 0) throw new Error('detection changed on the old runtime');
+            console.log('ok on node ' + process.version);
+          "
+
+  selfcheck:
+    name: self-analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: The vanished fixture must find all four mechanisms
+        run: |
+          node src/cli.ts examples/vanished --site example.com --json > vanished.json || true
+          node -e "
+            const r = require('./vanished.json');
+            const rules = new Set(r.findings.map((f) => f.ruleId));
+            for (const id of ['robots-txt-blocks-everything', 'header-hides-everything',
+                              'canonical-points-elsewhere']) {
+              if (!rules.has(id)) throw new Error('the fixture lost ' + id);
+            }
+            if (![...rules].some((id) => id.includes('noindex'))) {
+              throw new Error('the meta noindex finding disappeared');
+            }
+            if (r.summary.indexable !== 0) {
+              throw new Error('expected 0 indexable pages, got ' + r.summary.indexable);
+            }
+            console.log('vanished fixture ok');
+          "
+
+      - name: The canonical check must work without --site
+        run: |
+          node src/cli.ts examples/vanished --json > nosite.json || true
+          node -e "
+            const r = require('./nosite.json');
+            const rules = new Set(r.findings.map((f) => f.ruleId));
+            if (!rules.has('canonical-points-elsewhere')) {
+              throw new Error('the preview-host canonical was missed with no --site');
+            }
+            console.log('non-production host detection works unconfigured');
+          "
+
+      - name: The vanished fixture must exit 1
+        run: |
+          node src/cli.ts examples/vanished --site example.com > /dev/null 2>&1
+          code=$?
+          # 1 means findings. 2 would mean the tool could not run, which must
+          # not be mistaken for a successful detection.
+          if [ "$code" -ne 1 ]; then
+            echo "expected exit 1, got $code"
+            exit 1
+          fi
+
+      # The correct answer must produce silence above info.
+      - name: The indexed fixture must be clean
+        run: |
+          node src/cli.ts examples/indexed --json > indexed.json
+          node -e "
+            const r = require('./indexed.json');
+            const loud = r.findings.filter((f) => f.severity !== 'info');
+            if (loud.length) {
+              console.log(JSON.stringify(loud, null, 2));
+              throw new Error('a rule fired on the deploy that does everything right');
+            }
+            if (r.summary.indexable !== 3) throw new Error('the indexable count changed');
+            console.log('indexed fixture is clean, as intended');
+          "
+
+  publint:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Check the published package shape
+        run: |
+          npm pack --dry-run
+          node -e "
+            const fs = require('fs');
+            for (const f of ['dist/cli.js', 'dist/index.js', 'dist/index.d.ts']) {
+              if (!fs.existsSync(f)) throw new Error('missing from build: ' + f);
+            }
+            const pkg = require('./package.json');
+            if (Object.keys(pkg.dependencies || {}).length) {
+              throw new Error('deindexed must ship with zero runtime dependencies');
+            }
+            console.log('package shape ok');
+          "

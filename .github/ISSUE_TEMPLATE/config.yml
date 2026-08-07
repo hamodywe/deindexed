@@ -1,0 +1,13 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/hamodywe/deindexed/security/advisories/new
+    about: Please report privately. SECURITY.md describes what is in scope.
+  - name: What do these findings mean?
+    url: https://github.com/hamodywe/deindexed/blob/main/docs/rules.md
+    about: Every rule is documented with what it costs and how to fix it.
+  - name: My site is already deindexed
+    url: https://support.google.com/webmasters/answer/9012289
+    about: >
+      This tool prevents it; it cannot undo it. Google Search Console is where
+      recovery starts.

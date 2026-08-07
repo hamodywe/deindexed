@@ -1,0 +1,57 @@
+name: Wrong verdict
+description: A page reported as hidden that is indexed, or a clean report on a build that vanished
+title: '[verdict] '
+labels: [verdict]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most useful issue you can open.
+
+        The second option below matters most: a tool that misses a site-wide
+        noindex is worse than no tool, because catching it is the entire point.
+
+  - type: dropdown
+    id: direction
+    attributes:
+      label: What is wrong?
+      options:
+        - Reported as hidden, but the page is indexed fine
+        - Reported clean, but pages disappeared from search results
+        - Right finding, wrong severity
+        - A deliberate exclusion keeps being reported
+    validations:
+      required: true
+
+  - type: textarea
+    id: head
+    attributes:
+      label: The page head
+      description: The `<head>` of an affected page. Redact whatever you like.
+      render: html
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Any deploy configuration that sets headers
+      description: '`_headers`, `netlify.toml`, `vercel.json`, `.htaccess`, nginx — whichever applies.'
+      render: text
+
+  - type: textarea
+    id: output
+    attributes:
+      label: What deindexed said
+      description: Output of `deindexed <dir> --verbose`.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: deindexed version
+      placeholder: 0.1.0
+    validations:
+      required: true

@@ -1,0 +1,7 @@
+{
+  "site": "example.com",
+  "allowNoindex": [
+    "thank-you",
+    "admin/**"
+  ]
+}

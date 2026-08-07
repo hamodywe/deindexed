@@ -1,0 +1,65 @@
+{
+  "name": "deindexed",
+  "version": "0.1.0",
+  "description": "Catches the noindex, robots.txt and canonical mistakes that quietly remove a site from Google — before the deploy, not after the traffic goes.",
+  "keywords": [
+    "seo",
+    "noindex",
+    "robots-txt",
+    "canonical",
+    "deploy",
+    "static-site",
+    "static-analysis",
+    "ci",
+    "cli",
+    "developer-tools"
+  ],
+  "homepage": "https://github.com/hamodywe/deindexed#readme",
+  "bugs": {
+    "url": "https://github.com/hamodywe/deindexed/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamodywe/deindexed.git"
+  },
+  "license": "MIT",
+  "author": "hamodywe",
+  "type": "module",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "bin": {
+    "deindexed": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prepublishOnly": "npm run clean && npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/*.test.ts\"",
+    "test:coverage": "node --test --experimental-test-coverage \"test/*.test.ts\"",
+    "selfcheck": "node src/cli.ts examples/vanished --site example.com"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {},
+  "publishConfig": {
+    "access": "public"
+  }
+}
